@@ -233,31 +233,17 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
-// Add these new routes
+const upload = require('../middleware/cloudinary'); // 👈 use your Cloudinary upload middleware
+
 router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
   try {
-    console.log('Upload request received');
-    console.log('File:', req.file);
-    console.log('Body:', req.body);
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
     const docketId = req.body.docketId;
-    if (!docketId) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Docket ID is required' });
+    if (!req.file || !docketId) {
+      return res.status(400).json({ error: 'File and Docket ID required' });
     }
 
-    // Verify docket exists
     const docket = await CivilDocket.findById(docketId);
     if (!docket) {
-      fs.unlinkSync(req.file.path);
       return res.status(404).json({ error: 'Docket not found' });
     }
 
@@ -266,10 +252,10 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       originalname: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
-url: `/uploads/civil-dockets/${req.file.filename}`
+      url: req.file.path, // 👈 this is the cloudinary secure URL
     };
 
-    const updatedDocket = await CivilDocket.findByIdAndUpdate(
+    const updated = await CivilDocket.findByIdAndUpdate(
       docketId,
       { $push: { attachments: fileData } },
       { new: true }
@@ -277,16 +263,11 @@ url: `/uploads/civil-dockets/${req.file.filename}`
 
     res.json({ file: fileData });
   } catch (err) {
-    console.error('Upload error:', err);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ 
-      error: 'File upload failed',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ error: 'File upload failed' });
   }
 });
+
 
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
