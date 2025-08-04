@@ -252,7 +252,7 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
   originalname: req.file.originalname,
   mimetype: req.file.mimetype,
   size: req.file.size,
-  url: req.file.path || req.file.secure_url  // ✅ use secure_url if available
+  url: req.file.secure_url || req.file.path  // ✅ First try secure_url
 };
 
 
