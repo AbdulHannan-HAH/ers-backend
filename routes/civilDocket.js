@@ -247,13 +247,14 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       return res.status(404).json({ error: 'Docket not found' });
     }
 
-    const fileData = {
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-      url: req.file.path, // 👈 this is the cloudinary secure URL
-    };
+   const fileData = {
+  filename: req.file.filename,
+  originalname: req.file.originalname,
+  mimetype: req.file.mimetype,
+  size: req.file.size,
+  url: req.file.path || req.file.secure_url  // ✅ use secure_url if available
+};
+
 
     const updated = await CivilDocket.findByIdAndUpdate(
       docketId,
