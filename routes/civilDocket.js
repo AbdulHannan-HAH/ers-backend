@@ -16,7 +16,7 @@ router.post('/', verifyToken, async (req, res) => {
     const docket = new CivilDocket({
       ...req.body,
       court: user.circuitCourt,
-      submittedBy: req.user.userId
+      submittedBy: req.user.userId 
     });
 
     await docket.save();
