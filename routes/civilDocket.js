@@ -273,6 +273,8 @@ const fileData = {
 });
 
 
+const cloudinary = require('cloudinary').v2;
+
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
     const { url, docketId } = req.body;
@@ -280,14 +282,16 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'URL and docket ID are required' });
     }
 
-    // Remove file from filesystem
-    const filename = url.split('/').pop();
-    const filePath = path.join(__dirname, '../uploads/civil-dockets', filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // ✅ Extract public_id from Cloudinary URL
+    const parts = url.split('/');
+    const fileWithExt = parts[parts.length - 1]; // e.g. roznfaady92rh7uyqs6z.pdf
+    const folder = parts[parts.length - 2];      // e.g. ecms-files
+    const publicId = `${folder}/${fileWithExt.split('.')[0]}`; // ecms-files/roznfaady92rh7uyqs6z
 
-    // Remove file reference from docket
+    // ✅ Delete file from Cloudinary
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+
+    // ✅ Remove file reference from MongoDB
     await CivilDocket.findByIdAndUpdate(
       docketId,
       { $pull: { attachments: { url } } },
@@ -296,7 +300,8 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Delete error:', err);
+    res.status(500).json({ error: 'Failed to delete file' });
   }
 });
 
