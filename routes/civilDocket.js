@@ -263,6 +263,8 @@ const fileData = {
     );
 
     res.json({ file: fileData });
+    console.log("Uploaded file info:", req.file);
+
   } catch (err) {
     console.error('Cloudinary upload error:', err);
     res.status(500).json({ error: 'File upload failed' });
