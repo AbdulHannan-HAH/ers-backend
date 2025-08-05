@@ -237,6 +237,8 @@ const upload = require('../middleware/cloudinary'); // 👈 use your Cloudinary 
 
 router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
   try {
+        console.log("Uploaded file info:", req.file);
+
     const docketId = req.body.docketId;
     if (!req.file || !docketId) {
       return res.status(400).json({ error: 'File and Docket ID required' });
@@ -263,7 +265,6 @@ const fileData = {
     );
 
     res.json({ file: fileData });
-    console.log("Uploaded file info:", req.file);
 
   } catch (err) {
     console.error('Cloudinary upload error:', err);
