@@ -247,12 +247,12 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       return res.status(404).json({ error: 'Docket not found' });
     }
 
-   const fileData = {
+const fileData = {
   filename: req.file.filename,
   originalname: req.file.originalname,
   mimetype: req.file.mimetype,
   size: req.file.size,
-  url: req.file.secure_url || req.file.path  // ✅ First try secure_url
+  url: req.file.secure_url || req.file.path || '' // ✅ prioritize secure_url
 };
 
 
