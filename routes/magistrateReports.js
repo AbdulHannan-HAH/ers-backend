@@ -227,83 +227,77 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
+const upload = require('../middleware/cloudinary'); // 👈 use your Cloudinary upload middleware
 
-// Add these new routes
 router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+        console.log("Uploaded file info:", req.file);
+
+    const docketId = req.body.docketId;
+    if (!req.file || !docketId) {
+      return res.status(400).json({ error: 'File and Docket ID required' });
     }
 
-    const reportId = req.body.reportId;
-    if (!reportId) {
-      fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Report ID is required' });
+    const docket = await MagistrateReport.findById(docketId);
+    if (!docket) {
+      return res.status(404).json({ error: 'Docket not found' });
     }
 
-    // Verify report exists
-    const report = await MagistrateReport.findById(reportId);
-    if (!report) {
-      fs.unlinkSync(req.file.path);
-      return res.status(404).json({ error: 'Report not found' });
-    }
+const fileData = {
+  filename: req.file.filename,
+  originalname: req.file.originalname,
+  mimetype: req.file.mimetype,
+  size: req.file.size,
+  url: req.file.secure_url || req.file.path || '' // ✅ prioritize secure_url
+};
 
-    const fileData = {
-      filename: req.file.filename,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-  url: `/uploads/magistrate-reports/${req.file.filename}` // Relative URL
-   };
 
-    const updatedReport = await MagistrateReport.findByIdAndUpdate(
-      reportId,
+    const updated = await MagistrateReport.findByIdAndUpdate(
+      docketId,
       { $push: { attachments: fileData } },
       { new: true }
     );
 
     res.json({ file: fileData });
+
   } catch (err) {
-    console.error('Upload error:', err);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    res.status(500).json({ 
-      error: 'File upload failed',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ error: 'File upload failed' });
   }
 });
 
+
+const cloudinary = require('cloudinary').v2;
+
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
-    const { url, reportId } = req.body;
-    if (!url || !reportId) {
-      return res.status(400).json({ error: 'URL and report ID are required' });
+    const { url, docketId } = req.body;
+    if (!url || !docketId) {
+      return res.status(400).json({ error: 'URL and docket ID are required' });
     }
 
-    // Remove file from filesystem
-    const filename = url.split('/').pop();
-    const filePath = path.join(__dirname, '../uploads/magistrate-reports', filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // ✅ Extract public_id from Cloudinary URL
+    const parts = url.split('/');
+    const fileWithExt = parts[parts.length - 1]; // e.g. roznfaady92rh7uyqs6z.pdf
+    const folder = parts[parts.length - 2];      // e.g. ecms-files
+    const publicId = `${folder}/${fileWithExt.split('.')[0]}`; // ecms-files/roznfaady92rh7uyqs6z
 
-    // Remove file reference from report
+    // ✅ Delete file from Cloudinary
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+
+    // ✅ Remove file reference from MongoDB
     await MagistrateReport.findByIdAndUpdate(
-      reportId,
+      docketId,
       { $pull: { attachments: { url } } },
       { new: true }
     );
 
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Delete error:', err);
+    res.status(500).json({ error: 'Failed to delete file' });
   }
 });
+
 
 module.exports = router;
