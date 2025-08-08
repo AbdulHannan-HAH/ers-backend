@@ -15,13 +15,26 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
     const ext = path.extname(file.originalname).toLowerCase();
+    
+    // Supported file extensions
+    const supportedFormats = [
+      '.jpg', '.jpeg', '.png', 
+      '.pdf', 
+      '.doc', '.docx', 
+      '.xls', '.xlsx', 
+      '.ppt', '.pptx',
+      '.csv', '.txt'
+    ];
+
+    if (!supportedFormats.includes(ext)) {
+      throw new Error('Unsupported file format');
+    }
 
     return {
       folder: 'ecms-files',
-      resource_type: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].includes(ext)
-        ? 'raw' // ✅ non-image files
-        : 'auto', // ✅ images
-      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+      resource_type: 'auto', // Let Cloudinary automatically detect the type
+      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt'],
+      format: ext.replace('.', ''), // Preserve original format
     };
   },
 });
