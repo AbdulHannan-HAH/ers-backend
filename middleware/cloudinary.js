@@ -11,12 +11,19 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder: 'ecms-files', // You can name it based on route
-    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'docx', 'xlsx'],
+  params: (req, file) => {
+    return {
+      folder: 'ecms-files',
+      resource_type: 'auto', // 👈 Let Cloudinary detect the type
+      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+      format: async (req, file) => {
+        // Extract extension and map to Cloudinary's expected format
+        const ext = path.extname(file.originalname).substring(1);
+        return ext;
+      },
+    };
   },
 });
-
 const upload = multer({ storage });
 
 module.exports = upload;
