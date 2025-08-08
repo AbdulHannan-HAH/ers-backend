@@ -32,7 +32,7 @@ const storage = new CloudinaryStorage({
 
     return {
       folder: 'ecms-files',
-      resource_type: 'auto', // Let Cloudinary automatically detect the type
+      resource_type: 'raw', // Let Cloudinary automatically detect the type
       allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt'],
       format: ext.replace('.', ''), // Preserve original format
     };
