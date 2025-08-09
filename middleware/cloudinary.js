@@ -8,50 +8,23 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
-const path = require('path');
+const path = require('path'); // 👈 Add this at the top
 
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    
-    // Define document extensions
-    const documentExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.csv'];
-    
+  params: (req, file) => {
     return {
       folder: 'ecms-files',
-      resource_type: documentExtensions.includes(ext) ? 'raw' : 'image',
-      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv'],
-      format: ext.replace('.', ''),
-      // Special handling for MS Office files
-      transformation: documentExtensions.includes(ext) ? [{ flags: 'attachment' }] : []
+      resource_type: 'auto', // 👈 Let Cloudinary detect the type
+      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+      format: async (req, file) => {
+        // Extract extension and map to Cloudinary's expected format
+        const ext = path.extname(file.originalname).substring(1);
+        return ext;
+      },
     };
   },
 });
-const upload = multer({ 
-  storage,
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'image/jpeg',
-      'image/png',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    ];
-    
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'), false);
-    }
-  },
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
-  }
-});
+const upload = multer({ storage });
+
 module.exports = upload;
