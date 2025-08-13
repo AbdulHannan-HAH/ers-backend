@@ -244,9 +244,10 @@ const upload = require('../middleware/cloudinary');
 
 // Update the file upload route
 router.post('/upload', verifyToken, (req, res, next) => {
+  console.log('Upload request received'); // Log 1
   upload.single('file')(req, res, async (err) => {
     if (err) {
-      console.error('Upload middleware error:', err);
+      console.error('1. Upload middleware error:', err); // Log 2
       return res.status(400).json({ 
         error: err.message.includes('Invalid file type') 
           ? 'Unsupported file format' 
@@ -255,13 +256,18 @@ router.post('/upload', verifyToken, (req, res, next) => {
     }
 
     try {
+      console.log('2. File received:', req.file); // Log 3
+      
       if (!req.file) {
+        console.log('3. No file in request'); // Log 4
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
       const docketId = req.body.docketId;
+      console.log('4. Docket ID:', docketId); // Log 5
+      
       if (!docketId) {
-        // Clean up the uploaded file if no docketId
+        console.log('5. Missing docket ID'); // Log 6
         if (req.file.public_id) {
           await cloudinary.uploader.destroy(req.file.public_id);
         }
@@ -276,25 +282,31 @@ router.post('/upload', verifyToken, (req, res, next) => {
         url: req.file.secure_url,
         public_id: req.file.public_id
       };
+      console.log('6. File data prepared:', fileData); // Log 7
 
       const updated = await ReturnAssignment.findByIdAndUpdate(
         docketId,
         { $push: { attachments: fileData } },
         { new: true }
       );
+      console.log('7. Database updated:', updated); // Log 8
 
-      res.json({ file: fileData });
+      res.json({ 
+        success: true,
+        file: fileData 
+      });
     } catch (err) {
-      console.error('Upload processing error:', err);
-      // Clean up if something failed after upload
+      console.error('8. Processing error:', err); // Log 9
       if (req.file?.public_id) {
         await cloudinary.uploader.destroy(req.file.public_id);
       }
-      res.status(500).json({ error: 'File processing failed' });
+      res.status(500).json({ 
+        error: 'File processing failed',
+        details: err.message 
+      });
     }
   });
 });
-
 // Ensure the delete route matches
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
