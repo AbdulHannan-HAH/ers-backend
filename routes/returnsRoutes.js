@@ -244,34 +244,20 @@ const upload = require('../middleware/cloudinary');
 
 // Update the file upload route
 router.post('/upload', verifyToken, (req, res, next) => {
-  console.log('Upload request received'); // Log 1
   upload.single('file')(req, res, async (err) => {
     if (err) {
-      console.error('1. Upload middleware error:', err); // Log 2
-      return res.status(400).json({ 
-        error: err.message.includes('Invalid file type') 
-          ? 'Unsupported file format' 
-          : 'File upload failed'
-      });
+      console.error('Upload error:', err);
+      return res.status(400).json({ error: 'File upload failed' });
     }
 
     try {
-      console.log('2. File received:', req.file); // Log 3
-      
       if (!req.file) {
-        console.log('3. No file in request'); // Log 4
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const docketId = req.body.docketId;
-      console.log('4. Docket ID:', docketId); // Log 5
-      
-      if (!docketId) {
-        console.log('5. Missing docket ID'); // Log 6
-        if (req.file.public_id) {
-          await cloudinary.uploader.destroy(req.file.public_id);
-        }
-        return res.status(400).json({ error: 'Docket ID required' });
+      // Ensure we have the required Cloudinary fields
+      if (!req.file.secure_url || !req.file.public_id) {
+        throw new Error('Cloudinary upload incomplete - missing URL or public_id');
       }
 
       const fileData = {
@@ -279,31 +265,25 @@ router.post('/upload', verifyToken, (req, res, next) => {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        url: req.file.secure_url,
-        public_id: req.file.public_id
+        url: req.file.secure_url,       // Required
+        public_id: req.file.public_id   // Required
       };
-      console.log('6. File data prepared:', fileData); // Log 7
 
-      const updated = await ReturnAssignment.findByIdAndUpdate(
-        docketId,
-        { $push: { attachments: fileData } },
-        { new: true }
+      await ReturnAssignment.findByIdAndUpdate(
+        req.body.docketId,
+        { $push: { attachments: fileData } }
       );
-      console.log('7. Database updated:', updated); // Log 8
 
       res.json({ 
-        success: true,
-        file: fileData 
+        file: fileData  // Match frontend expected format exactly
       });
+
     } catch (err) {
-      console.error('8. Processing error:', err); // Log 9
+      console.error('Processing error:', err);
       if (req.file?.public_id) {
         await cloudinary.uploader.destroy(req.file.public_id);
       }
-      res.status(500).json({ 
-        error: 'File processing failed',
-        details: err.message 
-      });
+      res.status(500).json({ error: err.message });
     }
   });
 });
