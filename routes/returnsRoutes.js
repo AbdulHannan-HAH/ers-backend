@@ -260,15 +260,14 @@ router.post('/upload', verifyToken, (req, res, next) => {
         throw new Error('Cloudinary upload incomplete - missing URL or public_id');
       }
 
-      const fileData = {
-        filename: req.file.originalname,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        url: req.file.secure_url,       // Required
-        public_id: req.file.public_id   // Required
-      };
-
+     
+const fileData = {
+  filename: req.file.filename,
+  originalname: req.file.originalname,
+  mimetype: req.file.mimetype,
+  size: req.file.size,
+  url: req.file.secure_url || req.file.path || '' // ✅ prioritize secure_url
+};
       await ReturnAssignment.findByIdAndUpdate(
         req.body.docketId,
         { $push: { attachments: fileData } }
