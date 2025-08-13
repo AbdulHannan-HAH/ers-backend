@@ -237,8 +237,12 @@ router.patch('/chief/view/:id', verifyToken, verifyChief, async (req, res) => {
   }
 });
 
-const upload = require('../middleware/cloudinary'); // 👈 use your Cloudinary upload middleware
 
+// Add this near the top with other requires
+const cloudinary = require('cloudinary').v2;
+const upload = require('../middleware/cloudinary');
+
+// Update the file upload route
 router.post('/upload', verifyToken, (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) {
@@ -291,9 +295,7 @@ router.post('/upload', verifyToken, (req, res, next) => {
   });
 });
 
-
-const cloudinary = require('cloudinary').v2;
-
+// Ensure the delete route matches
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
     const { url, docketId } = req.body;
@@ -301,16 +303,16 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'URL and docket ID are required' });
     }
 
-    // ✅ Extract public_id from Cloudinary URL
+    // Extract public_id from Cloudinary URL
     const parts = url.split('/');
-    const fileWithExt = parts[parts.length - 1]; // e.g. roznfaady92rh7uyqs6z.pdf
-    const folder = parts[parts.length - 2];      // e.g. ecms-files
-    const publicId = `${folder}/${fileWithExt.split('.')[0]}`; // ecms-files/roznfaady92rh7uyqs6z
+    const fileWithExt = parts[parts.length - 1];
+    const folder = parts[parts.length - 2];
+    const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
 
-    // ✅ Delete file from Cloudinary
+    // Delete file from Cloudinary
     await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
 
-    // ✅ Remove file reference from MongoDB
+    // Remove file reference from MongoDB
     await ReturnAssignment.findByIdAndUpdate(
       docketId,
       { $pull: { attachments: { url } } },
@@ -323,7 +325,6 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete file' });
   }
 });
-
 
 // Admin: Clear all reports
 router.delete('/admin/clear-all', verifyToken, verifyAdmin, async (req, res) => {
