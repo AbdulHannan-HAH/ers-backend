@@ -238,29 +238,36 @@ router.patch('/chief/view/:id', verifyToken, verifyChief, async (req, res) => {
 });
 
 
-// Add this near the top with other requires
-const cloudinary = require('cloudinary').v2;
-const upload = require('../middleware/cloudinary');
 
-// Update the file upload route
-router.post('/upload', verifyToken, (req, res, next) => {
-  upload.single('file')(req, res, async (err) => {
-    if (err) {
-      console.error('Upload error:', err);
-      return res.status(400).json({ error: 'File upload failed' });
+// Admin: Clear all reports
+router.delete('/admin/clear-all', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    await ReturnAssignment.deleteMany({});
+    res.status(200).json({ message: 'All reports deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear reports' });
+  }
+});
+
+
+
+
+const upload = require('../middleware/cloudinary'); // 👈 use your Cloudinary upload middleware
+
+router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
+  try {
+        console.log("Uploaded file info:", req.file);
+
+    const docketId = req.body.docketId;
+    if (!req.file || !docketId) {
+      return res.status(400).json({ error: 'File and Docket ID required' });
     }
 
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
+    const docket = await ReturnAssignment.findById(docketId);
+    if (!docket) {
+      return res.status(404).json({ error: 'Docket not found' });
+    }
 
-      // Ensure we have the required Cloudinary fields
-      if (!req.file.secure_url || !req.file.public_id) {
-        throw new Error('Cloudinary upload incomplete - missing URL or public_id');
-      }
-
-     
 const fileData = {
   filename: req.file.filename,
   originalname: req.file.originalname,
@@ -268,25 +275,25 @@ const fileData = {
   size: req.file.size,
   url: req.file.secure_url || req.file.path || '' // ✅ prioritize secure_url
 };
-      await ReturnAssignment.findByIdAndUpdate(
-        req.body.docketId,
-        { $push: { attachments: fileData } }
-      );
 
-      res.json({ 
-        file: fileData  // Match frontend expected format exactly
-      });
 
-    } catch (err) {
-      console.error('Processing error:', err);
-      if (req.file?.public_id) {
-        await cloudinary.uploader.destroy(req.file.public_id);
-      }
-      res.status(500).json({ error: err.message });
-    }
-  });
+    const updated = await ReturnAssignment.findByIdAndUpdate(
+      docketId,
+      { $push: { attachments: fileData } },
+      { new: true }
+    );
+
+    res.json({ file: fileData });
+
+  } catch (err) {
+    console.error('Cloudinary upload error:', err);
+    res.status(500).json({ error: 'File upload failed' });
+  }
 });
-// Ensure the delete route matches
+
+
+const cloudinary = require('cloudinary').v2;
+
 router.delete('/delete-file', verifyToken, async (req, res) => {
   try {
     const { url, docketId } = req.body;
@@ -294,16 +301,16 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'URL and docket ID are required' });
     }
 
-    // Extract public_id from Cloudinary URL
+    // ✅ Extract public_id from Cloudinary URL
     const parts = url.split('/');
-    const fileWithExt = parts[parts.length - 1];
-    const folder = parts[parts.length - 2];
-    const publicId = `${folder}/${fileWithExt.split('.')[0]}`;
+    const fileWithExt = parts[parts.length - 1]; // e.g. roznfaady92rh7uyqs6z.pdf
+    const folder = parts[parts.length - 2];      // e.g. ecms-files
+    const publicId = `${folder}/${fileWithExt.split('.')[0]}`; // ecms-files/roznfaady92rh7uyqs6z
 
-    // Delete file from Cloudinary
+    // ✅ Delete file from Cloudinary
     await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
 
-    // Remove file reference from MongoDB
+    // ✅ Remove file reference from MongoDB
     await ReturnAssignment.findByIdAndUpdate(
       docketId,
       { $pull: { attachments: { url } } },
@@ -317,14 +324,5 @@ router.delete('/delete-file', verifyToken, async (req, res) => {
   }
 });
 
-// Admin: Clear all reports
-router.delete('/admin/clear-all', verifyToken, verifyAdmin, async (req, res) => {
-  try {
-    await ReturnAssignment.deleteMany({});
-    res.status(200).json({ message: 'All reports deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to clear reports' });
-  }
-});
 
 module.exports = router;
